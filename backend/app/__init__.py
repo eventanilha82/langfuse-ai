@@ -1,0 +1,1 @@
+"""FastAPI workshop backend."""
