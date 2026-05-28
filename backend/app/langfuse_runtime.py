@@ -6,6 +6,7 @@ import json
 import time
 from typing import Any, Iterator
 from urllib.error import URLError
+from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
 from app.config import settings
@@ -21,6 +22,10 @@ _availability_checked_at = 0.0
 _availability_result: bool | None = None
 _openai_agents_instrumented = False
 _openai_agents_instrumentation_error: str | None = None
+
+
+def _langfuse_health_url() -> str:
+    return urljoin(settings.langfuse_base_url.rstrip("/") + "/", "api/public/health")
 
 
 def _propagation_metadata(metadata: dict[str, Any] | None) -> dict[str, str] | None:
@@ -55,8 +60,8 @@ def _is_langfuse_available() -> bool:
         return _availability_result
 
     try:
-        request = Request(settings.langfuse_base_url, method="GET")
-        with urlopen(request, timeout=1.0) as response:
+        request = Request(_langfuse_health_url(), method="GET")
+        with urlopen(request, timeout=2.0) as response:
             _availability_result = response.status < 500
     except (OSError, TimeoutError, URLError):
         _availability_result = False

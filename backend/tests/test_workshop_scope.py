@@ -92,6 +92,43 @@ def test_health_reports_tracing_availability(monkeypatch: pytest.MonkeyPatch) ->
     assert body["promptName"] == "oracle-ai-lab-assistant"
 
 
+def test_langfuse_availability_uses_public_health_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, str | float] = {}
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+    def fake_urlopen(request, timeout: float):
+        seen["url"] = request.full_url
+        seen["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        langfuse_runtime,
+        "settings",
+        SimpleNamespace(
+            tracing_configured=True,
+            langfuse_availability_check=True,
+            langfuse_base_url="http://localhost:3000",
+        ),
+    )
+    monkeypatch.setattr(langfuse_runtime, "_availability_checked_at", 0.0)
+    monkeypatch.setattr(langfuse_runtime, "_availability_result", None)
+    monkeypatch.setattr(langfuse_runtime, "urlopen", fake_urlopen)
+
+    assert langfuse_runtime.langfuse_available() is True
+    assert seen == {
+        "url": "http://localhost:3000/api/public/health",
+        "timeout": 2.0,
+    }
+
+
 def test_prompt_management_fetches_prompt_by_configured_label(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakePrompt:
         prompt = "prompt remoto versionado"
